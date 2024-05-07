@@ -6,7 +6,7 @@ require (
 	github.com/puzpuzpuz/xsync/v3 v3.1.0
 	github.com/spf13/pflag v1.0.5
 	github.com/twipi/pubsub v0.0.0-20240419070506-7024f4e9981d
-	github.com/twipi/twipi v0.0.0-20240429051258-480f1376ea42
+	github.com/twipi/twipi v0.0.0-20240507090021-c01fb8b75798
 	golang.org/x/sync v0.6.0
 	google.golang.org/protobuf v1.33.0
 	libdb.so/hserve v0.0.0-20230404043009-95e112a6e0a5
