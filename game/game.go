@@ -44,6 +44,23 @@ type BoardPosition struct {
 	X, Y uint8
 }
 
+// BoardPositionAt returns a board position at the given coordinates.
+// If the coordinates are invalid, returns an error.
+func BoardPositionAt(x, y int) (BoardPosition, error) {
+	if x < 0 || x > 2 || y < 0 || y > 2 {
+		return BoardPosition{}, fmt.Errorf("invalid position: (%d, %d)", x, y)
+	}
+	return BoardPosition{X: uint8(x), Y: uint8(y)}, nil
+}
+
+// BoardPositionFromIndex returns a board position from the given index.
+func BoardPositionFromIndex(i int) (BoardPosition, error) {
+	if i < 0 || i > 8 {
+		return BoardPosition{}, fmt.Errorf("invalid index: %d", i)
+	}
+	return BoardPosition{X: uint8(i / 3), Y: uint8(i % 3)}, nil
+}
+
 // IsValid returns true if the position is valid.
 func (p BoardPosition) IsValid() bool {
 	return p.X < 3 && p.Y < 3

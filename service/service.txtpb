@@ -1,0 +1,26 @@
+name: "ttt"
+human_name: "Tic-tac-toe"
+description: "The game of Tic-tac-toe, now over text messages!"
+color: "#f75c45"
+icon_url: "https://m.media-amazon.com/images/I/51rux1Z+cGL.png"
+
+commands {
+  name: "start"
+  description: "Start a new game of Tic-tac-toe. The game will last for 24 hours before getting automatically deleted."
+}
+
+commands {
+  name: "place"
+  description: "Place your piece on the board."
+
+  argument_positions: ["position"]
+
+  arguments {
+    key: "position"
+    value {
+      description: "The position to place your piece, starting from 1 in the top left corner and ending at 9 in the bottom right corner."
+      required: true
+      hint: COMMAND_ARGUMENT_HINT_INTEGER
+    }
+  }
+}
