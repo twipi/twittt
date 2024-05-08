@@ -28,6 +28,7 @@ func main() {
 	defer cancel()
 
 	logger := slog.Default()
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 
 	os.Exit(start(ctx, logger))
 }

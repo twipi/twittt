@@ -75,6 +75,10 @@ func (s *Service) Service(ctx context.Context) (*twicmdproto.Service, error) {
 func (s *Service) Execute(ctx context.Context, req *twicmdproto.ExecuteRequest) (*twicmdproto.ExecuteResponse, error) {
 	switch req.Command.Command {
 	case "start":
+		s.logger.Debug(
+			"starting new game",
+			"phone_number", req.Message.From)
+
 		gm := game.NewGame()
 		ai := game.NewAI(gm, game.Player2)
 
@@ -94,37 +98,49 @@ func (s *Service) Execute(ctx context.Context, req *twicmdproto.ExecuteRequest) 
 			))
 		}
 
-		s.sendCh <- twisms.NewReplyingMessage(req.Message, drawBoardMessage(gm.Board))
+		s.sendCh <- twisms.NewReplyingMessage(req.Message, drawBoardMessage("", gm.Board))
 		return nil, nil
 
 	case "place":
+		args := twicmd.MapArguments(req.Command.Arguments)
+		s.logger.Debug(
+			"placing piece",
+			"phone_number", req.Message.From,
+			"position", args["position"])
+
 		gm, ok := s.games.Load(req.Message.From)
 		if !ok {
 			return twicmd.StatusResponse("No game found. Please start a new game."), nil
 		}
 
-		args := twicmd.MapArguments(req.Command.Arguments)
-
 		npos, err1 := strconv.Atoi(args["position"])
-		bpos, err2 := game.BoardPositionFromIndex(npos)
+		bpos, err2 := game.BoardPositionFromIndex(npos - 1)
 		if err1 != nil || err2 != nil {
 			return twicmd.StatusResponse("Invalid position. Please provide a number between 1 and 9."), nil
 		}
 
-		for _, ok := range []bool{gm.MakeMove(bpos), gm.AI.MakeMove()} {
-			if ok {
-				s.sendCh <- twisms.NewReplyingMessage(req.Message, drawBoardMessage(gm.Board))
-				continue
-			}
+		msgs := []string{
+			"You just placed:",
+			"In return, the AI placed:",
+		}
 
-			if winner, ended := gm.GameState(); ended {
-				var msg string
-				if winner != game.NoPlayer {
-					msg = fmt.Sprintf("The game is over. %s wins!", playerUnicode[winner])
-				} else {
-					msg = "The game is over. It's a draw!"
+		for i, move := range []func() bool{
+			func() bool { return gm.MakeMove(bpos) },
+			func() bool { return gm.AI.MakeMove() },
+		} {
+			ok := move()
+			s.sendCh <- twisms.NewReplyingMessage(req.Message, drawBoardMessage(msgs[i], gm.Board))
+			if !ok {
+				if winner, ended := gm.GameState(); ended {
+					var msg string
+					if winner != game.NoPlayer {
+						msg = fmt.Sprintf("The game is over. %s wins!", playerUnicode[winner])
+					} else {
+						msg = "The game is over. It's a draw!"
+					}
+					return twicmd.TextResponse(msg), nil
 				}
-				return twicmd.TextResponse(msg), nil
+				return twicmd.StatusResponse("Invalid move. Please try again."), nil
 			}
 		}
 
@@ -141,18 +157,21 @@ var playerUnicode = map[game.Player]string{
 	game.NoPlayer: "⬜",
 }
 
-func drawBoardMessage(board game.Board) *twismsproto.MessageBody {
+func drawBoardMessage(prefix string, board game.Board) *twismsproto.MessageBody {
 	var s strings.Builder
-	s.WriteString("❌ is your piece.\n")
-	s.WriteString("⚫ is the AI's piece.\n")
+	if prefix != "" {
+		s.WriteString(prefix)
+		s.WriteString("\n\n")
+	}
 	for r := range 3 {
 		for c := range 3 {
 			s.WriteString(playerUnicode[board[r][c]])
 		}
 		s.WriteString("\n")
 	}
-	t := strings.TrimRight(s.String(), "\n")
-	return twisms.NewTextBody(t)
+	s.WriteString("❌ is your piece.\n")
+	s.WriteString("⚫ is the AI's piece.")
+	return twisms.NewTextBody(s.String())
 }
 
 func (s *Service) Start(ctx context.Context) error {
