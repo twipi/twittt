@@ -17,6 +17,7 @@ import (
 	"github.com/twipi/twipi/twicmd"
 	"github.com/twipi/twipi/twisms"
 	"github.com/twipi/twittt/game"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/encoding/prototext"
 )
 
@@ -155,28 +156,38 @@ func drawBoardMessage(board game.Board) *twismsproto.MessageBody {
 }
 
 func (s *Service) Start(ctx context.Context) error {
-	ticker := time.NewTicker(4 * time.Hour)
-	defer ticker.Stop()
+	errg, ctx := errgroup.WithContext(ctx)
 
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
+	errg.Go(func() error {
+		return s.sendSub.Listen(ctx, s.sendCh)
+	})
 
-		case now := <-ticker.C:
-			// clean up
-			s.games.Range(func(key string, value *runningGame) bool {
-				if value.StartedAt.Add(gameExpiry).Before(now) {
-					s.logger.Debug(
-						"game expired, deleting",
-						"phone_number", key,
-						"started_at", value.StartedAt)
-					s.games.Delete(key)
-				}
-				return true
-			})
+	errg.Go(func() error {
+		ticker := time.NewTicker(4 * time.Hour)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+
+			case now := <-ticker.C:
+				// clean up
+				s.games.Range(func(key string, value *runningGame) bool {
+					if value.StartedAt.Add(gameExpiry).Before(now) {
+						s.logger.Debug(
+							"game expired, deleting",
+							"phone_number", key,
+							"started_at", value.StartedAt)
+						s.games.Delete(key)
+					}
+					return true
+				})
+			}
 		}
-	}
+	})
+
+	return errg.Wait()
 }
 
 // SubscribeMessages implements [twisms.MessageSubscriber].
